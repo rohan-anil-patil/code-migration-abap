@@ -1,0 +1,617 @@
+
+*&---------------------------------------------------------------------*
+*& REPORT  ZFT_CUSTPAY               | TRANSACTION : ZCUSTPAY
+*&
+*&--------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+
+REPORT  ZFT_CUST_PAY.
+TABLES :  BSAD .
+
+TYPE-POOLS: SLIS.
+
+DATA : IFCAT   TYPE SLIS_T_FIELDCAT_ALV,
+       WFCAT   TYPE SLIS_FIELDCAT_ALV,
+       WLAYOUT TYPE SLIS_LAYOUT_ALV,
+       WVARI   TYPE DISVARIANT.
+DATA : TEVENT TYPE SLIS_T_EVENT,
+       WEVENT LIKE LINE OF TEVENT.
+DATA : TSORT TYPE SLIS_T_SORTINFO_ALV,
+       WSORT TYPE SLIS_SORTINFO_ALV.
+DATA : ALV_HEADER TYPE SLIS_T_LISTHEADER WITH HEADER LINE.
+*  ***************************End - ALV
+
+DATA : BEGIN OF IFINAL OCCURS 0,
+         COUNT  TYPE I,
+         BUKRS  LIKE BSAD-BUKRS        ,  "Company code
+         KUNNR  LIKE BSAD-KUNNR        ,  "Customer Code
+         NAME1  LIKE KNA1-NAME1        ,  "Customer Name
+         BUPLA  LIKE BSAD-BUPLA        ,  "Business place
+         LNAME  LIKE LFA1-NAME1,
+         LIFNR  LIKE VBPA-LIFNR,
+         BELNR  LIKE BSAD-BELNR        ,  "Doc NO.
+         GJAHR  LIKE BSAD-GJAHR        ,  "Fiscal YeaR
+         AUGBL  LIKE BSAD-AUGBL,
+         AUGDT  LIKE BSAD-AUGDT,
+         ZUONR  LIKE BSAD-ZUONR,
+         BUDAT  LIKE BSAD-BUDAT,
+         BLDAT  LIKE BSAD-BLDAT        ,  "Doc Date
+         BLART  LIKE BSAD-BLART        ,  "Doc Type
+         DMBTR  LIKE BSAD-DMBTR        ,  "AMT IN LC
+         SHKZG  LIKE BSAD-SHKZG,
+         DIF    LIKE RFPOSXEXT-DUEDATE1,  "no of due date
+         ZBD1T  LIKE BSAD-ZBD1T        ,  "Due date range
+         IN_AMT LIKE BSAD-WRBTR        , " Added by ft prashant on 21.09.2017
+         NETDT  LIKE BSAD-BLDAT,  "due date
+         CRDYS  TYPE I ,  "Credit Days
+         PDDYS  TYPE I ,  "Paid Days
+         INV    LIKE BSAD-WRBTR,
+         TINV   LIKE BSAD-WRBTR,
+       END OF IFINAL.
+
+DATA : BEGIN OF ICOLL OCCURS 0,
+         KUNNR  LIKE BSAD-KUNNR,
+         DMBTR  LIKE BSAD-DMBTR,
+         IN_AMT LIKE BSAD-WRBTR,
+       END OF ICOLL.
+
+DATA : DUE_DT       TYPE BSAD-BLDAT,  "due date
+       IN_AMT       TYPE BSAD-WRBTR,
+       DAYS_BETWEEN TYPE I,
+       I_FAEDE      LIKE  FAEDE,
+       E_FAEDE      LIKE  FAEDE.
+
+DATA : IBSAD TYPE TABLE OF BSAD WITH HEADER LINE.
+DATA : IVBRK TYPE TABLE OF VBRK WITH HEADER LINE.
+
+PERFORM SET_FIELDCAT CHANGING IFCAT.
+
+PERFORM SET_LAYOUT CHANGING WLAYOUT.
+
+PERFORM ALV_SORT.
+
+
+SELECTION-SCREEN BEGIN OF  BLOCK A WITH FRAME TITLE TEXT-001.
+
+SELECT-OPTIONS : S_BUKRS FOR BSAD-BUKRS NO INTERVALS
+                 NO-EXTENSION OBLIGATORY DEFAULT '1000',
+                 S_KUNNR FOR BSAD-KUNNR ,
+                 S_BUDAT FOR BSAD-BUDAT OBLIGATORY DEFAULT SY-DATUM.
+PARAMETERS:   KBETR TYPE KONV-KBETR.
+SELECTION-SCREEN END OF BLOCK A.
+
+
+START-OF-SELECTION.
+
+  PERFORM SELECT_DATA.
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      I_CALLBACK_PROGRAM      = SY-REPID
+*     I_CALLBACK_PF_STATUS_SET = 'GUI_STAT'
+      I_CALLBACK_USER_COMMAND = 'USER_COMMAND'
+      IS_LAYOUT               = WLAYOUT
+      IT_FIELDCAT             = IFCAT
+*     IT_SORT                 = TSORT
+      I_DEFAULT               = 'X'
+      I_SAVE                  = 'A'
+      IT_EVENTS               = TEVENT
+    TABLES
+      T_OUTTAB                = IFINAL
+    EXCEPTIONS
+      PROGRAM_ERROR           = 1
+      OTHERS                  = 2.
+
+
+
+FORM SET_FIELDCAT  CHANGING IFCAT TYPE SLIS_T_FIELDCAT_ALV.
+
+  REFRESH IFCAT[].
+
+  DATA: LV_COL TYPE I VALUE 0.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'COUNT'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Count'.
+  WFCAT-SELTEXT_M = 'Count'.
+  WFCAT-SELTEXT_L = 'Count'.
+  WFCAT-REPTEXT_DDIC = 'Count'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'BUKRS'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Company Code'.
+  WFCAT-SELTEXT_M = 'Company Code'.
+  WFCAT-SELTEXT_L = 'Company Code'.
+  WFCAT-REPTEXT_DDIC = 'Company Code'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'KUNNR'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Customer Code'.
+  WFCAT-SELTEXT_M = 'Customer Code'.
+  WFCAT-SELTEXT_L = 'Customer Code'.
+  WFCAT-REPTEXT_DDIC = 'Customer Code'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'NAME1'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Customer Name'.
+  WFCAT-SELTEXT_M = 'Customer Name'.
+  WFCAT-SELTEXT_L = 'Customer Name'.
+  WFCAT-REPTEXT_DDIC = 'Customer Name'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'BUPLA'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Business place'.
+  WFCAT-SELTEXT_M = 'Business place'.
+  WFCAT-SELTEXT_L = 'Business place'.
+  WFCAT-REPTEXT_DDIC = 'Business place'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'LIFNR'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Marketing Manager' .
+  WFCAT-SELTEXT_M = 'Marketing Manager' .
+  WFCAT-SELTEXT_L = 'Marketing Manager' .
+  WFCAT-REPTEXT_DDIC = 'Marketing Manager' .
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'LNAME'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Marketing Manager' .
+  WFCAT-SELTEXT_M = 'Marketing Manager' .
+  WFCAT-SELTEXT_L = 'Marketing Manager' .
+  WFCAT-REPTEXT_DDIC = 'Marketing Manager' .
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'BELNR'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-NO_ZERO   = 'X'.
+  WFCAT-EMPHASIZE =  '   '.
+  WFCAT-HOTSPOT   =  'X'.
+*  wFCAT-DO_SUM    = 'X'.
+  WFCAT-SELTEXT_S = 'Account No.' .
+  WFCAT-SELTEXT_M = 'Account No.' .
+  WFCAT-SELTEXT_L = 'Account Number' .
+  WFCAT-REPTEXT_DDIC = 'Account No.' .
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'GJAHR'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Fiscal Year' .
+  WFCAT-SELTEXT_M = 'Fiscal Year' .
+  WFCAT-SELTEXT_L = 'Fiscal Year' .
+  WFCAT-REPTEXT_DDIC = 'Fiscal Year' .
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'BLDAT'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Document Date'.
+  WFCAT-SELTEXT_M = 'Document Date'.
+  WFCAT-SELTEXT_L = 'Document Date'.
+  WFCAT-REPTEXT_DDIC = 'Document Date'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'BUDAT'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Posting Date'.
+  WFCAT-SELTEXT_M = 'Posting Date'.
+  WFCAT-SELTEXT_L = 'Posting  Date'.
+  WFCAT-REPTEXT_DDIC = 'Posting  Date'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'AUGBL'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-NO_ZERO   = 'X'.
+  WFCAT-EMPHASIZE =  ''.
+  WFCAT-HOTSPOT   =  'X'.
+*  wFCAT-DO_SUM    = 'X'.
+  WFCAT-SELTEXT_S = 'Clearing Document'.
+  WFCAT-SELTEXT_M = 'Clearing Document'.
+  WFCAT-SELTEXT_L = 'Clearing Document'.
+  WFCAT-REPTEXT_DDIC = 'Clearing Document'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'AUGDT'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Clearing Date'.
+  WFCAT-SELTEXT_M = 'Clearing Date'.
+  WFCAT-SELTEXT_L = 'Clearing Date'.
+  WFCAT-REPTEXT_DDIC = 'Clearing Date'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'NETDT'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Net Due Dt '.
+  WFCAT-SELTEXT_M = 'Net Due Date'.
+  WFCAT-SELTEXT_L = 'Net Due Date'.
+  WFCAT-REPTEXT_DDIC = 'Net Due Dt Date'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'ZUONR'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Assignment'.
+  WFCAT-SELTEXT_M = 'Assignment'.
+  WFCAT-SELTEXT_L = 'Assignment'.
+  WFCAT-REPTEXT_DDIC = 'Assignment'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'BLART'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Document type'.
+  WFCAT-SELTEXT_M = 'Document type'.
+  WFCAT-SELTEXT_L = 'Document type'.
+  WFCAT-REPTEXT_DDIC = 'Document type'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'DMBTR'.
+  WFCAT-TABNAME   = 'IFINAL'.
+*  WFCAT-EMPHASIZE =  'X'.
+  WFCAT-DO_SUM    = 'X'.
+  WFCAT-SELTEXT_S = 'Amt.in loc.cur.'.
+  WFCAT-SELTEXT_M = 'Amt.in loc.cur.'.
+  WFCAT-SELTEXT_L = 'Amount.in loc.cur.'.
+  WFCAT-REPTEXT_DDIC = 'Amt.in loc.cur.'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'SHKZG'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Debit/Credit ind'.
+  WFCAT-SELTEXT_M = 'Debit/Credit ind'.
+  WFCAT-SELTEXT_L = 'Debit/Credit ind'.
+  WFCAT-REPTEXT_DDIC ='Debit/Credit ind'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'IN_AMT'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Interest Amount'.
+  WFCAT-SELTEXT_M = 'Interest Amount'.
+  WFCAT-SELTEXT_L = 'Interest Amount'.
+  WFCAT-REPTEXT_DDIC = 'Interest Amount'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'CRDYS'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Credit Days'.
+  WFCAT-SELTEXT_M = 'Credit Days'.
+  WFCAT-SELTEXT_L = 'Credit Days'.
+  WFCAT-REPTEXT_DDIC = 'Credit Days'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'PDDYS'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Paid Days'.
+  WFCAT-SELTEXT_M = 'Paid Days'.
+  WFCAT-SELTEXT_L = 'Paid Days'.
+  WFCAT-REPTEXT_DDIC = 'Paid Days'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'INV'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Interest % Invoice'.
+  WFCAT-SELTEXT_M = 'Interest % Invoice'.
+  WFCAT-SELTEXT_L = 'Interest % Invoice'.
+  WFCAT-REPTEXT_DDIC = 'Interest % Invoice'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+  LV_COL            = 1 + LV_COL.
+  WFCAT-COL_POS   = LV_COL.
+  WFCAT-FIELDNAME = 'TINV'.
+  WFCAT-TABNAME   = 'IFINAL'.
+  WFCAT-SELTEXT_S = 'Tot Int % Invoice'.
+  WFCAT-SELTEXT_M = 'Total Interest % Invoice'.
+  WFCAT-SELTEXT_L = 'Total Interest % Invoice'.
+  WFCAT-REPTEXT_DDIC = 'Total Interest % Invoice'.
+  APPEND WFCAT TO IFCAT.
+  CLEAR WFCAT.
+
+ENDFORM.
+
+FORM SET_LAYOUT CHANGING WLAYOUT TYPE SLIS_LAYOUT_ALV.
+
+*  LS_LAYOUT-BOX_FIELDNAME     = 'SEL'.
+  WLAYOUT-ZEBRA = 'X'.
+  WLAYOUT-COLWIDTH_OPTIMIZE = 'X'.
+
+ENDFORM.                    " SET_LAYOUT
+
+FORM SELECT_DATA .
+
+  REFRESH IBSAD.
+
+  SELECT * FROM BSAD
+    INTO TABLE IBSAD
+   WHERE BUKRS IN S_BUKRS
+     AND KUNNR IN S_KUNNR
+     AND BUDAT IN S_BUDAT
+     AND BLART EQ 'RV'.
+
+  IF IBSAD[] IS NOT INITIAL.
+    SORT IBSAD BY KUNNR.
+
+    REFRESH IVBRK.
+
+    SELECT * FROM VBRK
+      INTO TABLE IVBRK
+      FOR ALL ENTRIES IN IBSAD
+      WHERE VBELN EQ IBSAD-VBELN.
+
+    IF IVBRK[] IS NOT INITIAL.
+      LOOP AT IVBRK.
+        IF IVBRK-FKART EQ 'S1'.
+          DELETE TABLE IVBRK FROM IVBRK.
+        ENDIF.
+        IF IVBRK-FKART EQ 'ZRE'.
+          DELETE TABLE IVBRK FROM IVBRK.
+        ENDIF.
+
+        IF IVBRK-FKSTO EQ 'X'.
+          DELETE TABLE IVBRK FROM IVBRK.
+        ENDIF.
+        CLEAR IVBRK.
+      ENDLOOP.
+    ENDIF.
+*        AND ( FKART NE 'S1' OR  FKART NE 'ZRE' )
+*        AND FKSTO NE 'X'.
+
+
+    LOOP AT IBSAD.
+      CLEAR IVBRK.
+
+      READ TABLE IVBRK WITH KEY VBELN = IBSAD-VBELN.
+      IF SY-SUBRC = 0.
+        IFINAL-COUNT = '1'.
+
+        MOVE IBSAD-BUKRS TO IFINAL-BUKRS.
+        MOVE IBSAD-KUNNR TO IFINAL-KUNNR.
+
+        SELECT SINGLE NAME1 INTO IFINAL-NAME1
+          FROM KNA1 BYPASSING BUFFER
+          WHERE KUNNR = IBSAD-KUNNR.
+
+        IF IBSAD-VBELN IS NOT INITIAL.
+          CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+            EXPORTING
+              INPUT  = IBSAD-VBELN
+            IMPORTING
+              OUTPUT = IBSAD-VBELN.
+
+          MOVE IVBRK-BUPLA TO IFINAL-BUPLA.
+*        SELECT SINGLE BUPLA  FROM VBRK
+*          INTO IFINAL-BUPLA
+*          WHERE VBELN = IBSAD-VBELN.
+
+          SELECT SINGLE LIFNR  FROM VBPA
+         INTO IFINAL-LIFNR
+         WHERE VBELN = IBSAD-VBELN
+           AND PARVW = 'VE'.
+
+          SELECT SINGLE NAME1 FROM LFA1 INTO IFINAL-LNAME
+            WHERE LIFNR = IFINAL-LIFNR.
+
+        ENDIF.
+
+*      IFINAL-DUE_DT = IBSAD-AUGDT  + IBSAD-ZBD1T.
+        MOVE IBSAD-BELNR  TO IFINAL-BELNR.
+        MOVE IBSAD-GJAHR TO IFINAL-GJAHR.
+        MOVE IBSAD-AUGBL TO IFINAL-AUGBL.
+        MOVE IBSAD-AUGDT TO IFINAL-AUGDT.
+        MOVE IBSAD-ZUONR TO IFINAL-ZUONR.
+        MOVE IBSAD-BUDAT TO IFINAL-BUDAT.
+        MOVE IBSAD-BLDAT TO IFINAL-BLDAT.
+        MOVE IBSAD-BLART TO IFINAL-BLART.
+
+        IF IBSAD-SHKZG = 'H'                         .
+          IBSAD-DMBTR = IBSAD-DMBTR * -1             .
+        ELSE .
+          IBSAD-DMBTR = IBSAD-DMBTR * 1.
+        ENDIF.
+
+        MOVE IBSAD-DMBTR TO IFINAL-DMBTR.
+        MOVE IBSAD-SHKZG TO IFINAL-SHKZG.
+
+        CLEAR I_FAEDE.
+        I_FAEDE-SHKZG = IBSAD-SHKZG .
+        I_FAEDE-ZFBDT = IBSAD-ZFBDT .
+        I_FAEDE-ZBD1T = IBSAD-ZBD1T .
+        I_FAEDE-BLDAT = IBSAD-BLDAT .
+        SELECT SINGLE KOART FROM BSEG INTO I_FAEDE-KOART
+          WHERE BUKRS EQ IBSAD-BUKRS
+            AND BELNR EQ IBSAD-BELNR
+            AND GJAHR EQ IBSAD-GJAHR
+            AND AUGBL EQ IBSAD-AUGBL
+            AND KUNNR EQ IBSAD-KUNNR.
+
+        IF I_FAEDE IS NOT INITIAL.
+          CLEAR E_FAEDE.
+          CALL FUNCTION 'DETERMINE_DUE_DATE'
+            EXPORTING
+              I_FAEDE                    = I_FAEDE
+*             I_GL_FAEDE                 =
+            IMPORTING
+              E_FAEDE                    = E_FAEDE
+            EXCEPTIONS
+              ACCOUNT_TYPE_NOT_SUPPORTED = 1
+              OTHERS                     = 2.
+          IF SY-SUBRC = 0.
+            MOVE E_FAEDE-NETDT TO IFINAL-NETDT.
+
+            CLEAR DAYS_BETWEEN.
+
+            CALL FUNCTION 'HR_99S_INTERVAL_BETWEEN_DATES'
+              EXPORTING
+                BEGDA = E_FAEDE-NETDT
+                ENDDA = IBSAD-AUGDT
+              IMPORTING
+                DAYS  = DAYS_BETWEEN.
+
+          ENDIF.
+
+        ENDIF.
+
+        IF DAYS_BETWEEN GE 0.
+          IN_AMT = KBETR / 365 * DAYS_BETWEEN.
+
+          IFINAL-IN_AMT = IN_AMT * IBSAD-DMBTR / 100 ."* DAYS_BETWEEN.
+        ENDIF.
+
+*INV
+        CALL FUNCTION 'HR_99S_INTERVAL_BETWEEN_DATES'
+          EXPORTING
+            BEGDA = IBSAD-BLDAT
+            ENDDA = E_FAEDE-NETDT
+          IMPORTING
+            DAYS  = IFINAL-CRDYS.
+
+        IF IFINAL-CRDYS = '1'.
+          IFINAL-CRDYS = '0'.
+        ENDIF.
+
+        CALL FUNCTION 'HR_99S_INTERVAL_BETWEEN_DATES'
+          EXPORTING
+            BEGDA = IBSAD-BLDAT "IBSAD-AUGDT
+            ENDDA = IBSAD-AUGDT "IBSAD-BLDAT
+          IMPORTING
+            DAYS  = IFINAL-PDDYS.
+
+        IF IFINAL-PDDYS = '1'.
+          IFINAL-PDDYS = '0'.
+        ENDIF.
+
+        IFINAL-INV =  100 * IFINAL-IN_AMT / IBSAD-DMBTR.
+
+        MOVE IFINAL-KUNNR TO ICOLL-KUNNR.
+        MOVE IFINAL-DMBTR TO ICOLL-DMBTR.
+        MOVE IFINAL-IN_AMT TO ICOLL-IN_AMT.
+
+        APPEND IFINAL.
+        COLLECT  ICOLL .
+
+        CLEAR: IBSAD,IFINAL,IN_AMT,IVBRK.
+      ENDIF.
+    ENDLOOP.
+
+  ENDIF.
+
+  LOOP AT IFINAL.
+    DATA : TINV LIKE BSAD-WRBTR,
+           FLG  TYPE C.
+    READ TABLE ICOLL WITH KEY KUNNR = IFINAL-KUNNR.
+
+    AT NEW KUNNR.
+      CLEAR FLG.
+      FLG = 'X'.
+      IF ICOLL-IN_AMT IS NOT INITIAL AND ICOLL-DMBTR IS NOT INITIAL.
+        TINV = 100 * ICOLL-IN_AMT / ICOLL-DMBTR.
+      ENDIF.
+    ENDAT.
+
+    IF FLG = 'X'.
+      IFINAL-TINV = TINV.
+    ELSE.
+      CLEAR IFINAL-TINV.
+    ENDIF.
+
+    MODIFY TABLE IFINAL FROM IFINAL ."TRANSPORTING TINV.
+    CLEAR : IFINAL,ICOLL,TINV,FLG .
+  ENDLOOP.
+
+
+ENDFORM.
+
+FORM ALV_SORT .
+
+*  WSORT-FIELDNAME = 'MATNR'.
+*  WSORT-UP = 'X'.
+*  WSORT-SUBTOT = 'X'.
+*  APPEND WSORT TO TSORT.
+*  CLEAR WSORT.
+
+ENDFORM.                    " ALV_SORT
+
+FORM USER_COMMAND USING F_UCOMM LIKE SY-UCOMM
+                  I_SELFIELD TYPE SLIS_SELFIELD.
+  CASE F_UCOMM.
+    WHEN '&IC1'.
+      IF I_SELFIELD-FIELDNAME = 'BELNR'.
+        CLEAR IFINAL.
+        READ TABLE IFINAL INDEX I_SELFIELD-TABINDEX.
+        SET PARAMETER ID 'BLN' FIELD IFINAL-BELNR.
+        SET PARAMETER ID 'BUK' FIELD IFINAL-BUKRS.
+        SET PARAMETER ID 'GJR' FIELD IFINAL-GJAHR.
+        CALL TRANSACTION 'FB03' AND SKIP FIRST SCREEN.
+*      ELSEIF I_SELFIELD-FIELDNAME = 'AGR_NAME'.
+*        SET PARAMETER ID 'XUS' FIELD I_SELFIELD-VALUE.
+*        CALL TRANSACTION 'SU01' AND SKIP FIRST SCREEN.
+      ENDIF.
+  ENDCASE.
+ENDFORM.                    "USER_COMMAND1

@@ -1,0 +1,193 @@
+*&---------------------------------------------------------------------*
+*& Report ZFT_CUSTPAY_NEW
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT ZFT_CUSTPAY_NEW.
+
+INCLUDE ZFT_CUSTPAY_NEW_TOP.
+
+INCLUDE ZFT_CUSTPAY_NEW_SS.
+
+INCLUDE ZFT_CUSTPAY_NEW_IMP.
+
+START-OF-SELECTION.
+LO_CUS = NEW CL_CUSTPAY( ).
+LO_CUS->GET_DATA( ).
+LO_CUS->DISPLAY_DATA( ).
+
+*&---------------------------------------------------------------------*
+*& Include          ZFT_CUSTPAY_NEW_TOP
+*&---------------------------------------------------------------------*
+
+TABLES : BSAD,KONV,LFA1,VBRK.
+
+TYPES : BEGIN OF TY_FINAL,
+         BUKRS  Type BSAD-BUKRS,  "Company code
+         KUNNR  Type BSAD-KUNNR,  "Customer Code
+         BUPLA  Type BSAD-BUPLA,  "Business place
+         BELNR  Type BSAD-BELNR,  "Doc NO.
+         GJAHR  Type BSAD-GJAHR,  "Fiscal YeaR
+         AUGBL  Type BSAD-AUGBL,
+         AUGDT  Type BSAD-AUGDT,
+         ZUONR  Type BSAD-ZUONR,
+         BUDAT  Type BSAD-BUDAT,
+         BLDAT  Type BSAD-BLDAT,  "Doc Date
+         BLART  Type BSAD-BLART,  "Doc Type
+         DMBTR  Type BSAD-DMBTR,  "AMT IN LC
+         SHKZG  Type BSAD-SHKZG,
+         ZBD1T  Type BSAD-ZBD1T,  "Due date range
+         IN_AMT Type BSAD-WRBTR,  " Added by ft prashant on 21.09.2017
+         NETDT  Type BSAD-BLDAT,  "due date
+         NAME1  Type KNA1-NAME1,  "Customer Name
+         LNAME  Type LFA1-NAME1,
+         LIFNR  Type VBPA-LIFNR,
+         DIF    Type RFPOSXEXT-DUEDATE1,  "no of due date
+         CRDYS  TYPE I ,                  "Credit Days
+         PDDYS  TYPE I ,                  "Paid Days
+         INV    LIKE BSAD-WRBTR,
+         TINV   LIKE BSAD-WRBTR,
+         total_amt TYPE bsad-dmbtr,
+        END OF TY_FINAL.
+
+DATA : GT_FINAL TYPE TABLE OF TY_FINAL,
+       GS_FINAL TYPE TY_FINAL.
+
+DATA : lo_cus_obj TYPE REF TO cl_salv_table.
+DATA : lo_gr_functions TYPE REF TO cl_salv_functions_list.
+
+DATA: lo_selections TYPE REF TO cl_salv_selections,
+      lo_columns    TYPE REF TO cl_salv_columns_table,
+      lo_column     TYPE REF TO cl_salv_column.
+	  
+
+*&---------------------------------------------------------------------*
+*& Include          ZFT_CUSTPAY_NEW_SS
+*&---------------------------------------------------------------------*
+
+SELECTION-SCREEN BEGIN OF  BLOCK b1 WITH FRAME TITLE TEXT-001.
+  SELECT-OPTIONS : s_bukrs FOR bsad-bukrs NO INTERVALS
+                   NO-EXTENSION OBLIGATORY DEFAULT '1000',
+                   s_kunnr FOR bsad-kunnr ,
+                   s_budat FOR bsad-budat .
+  PARAMETERS     : p_kbetr LIKE konv-kbetr.
+SELECTION-SCREEN END OF BLOCK b1.
+
+*&---------------------------------------------------------------------*
+*& Include          ZFT_CUSTPAY_NEW_IMP
+*&---------------------------------------------------------------------*
+CLASS cl_custpay DEFINITION.
+  PUBLIC SECTION.
+    METHODS:
+      get_data,
+      display_data.
+ENDCLASS.
+
+DATA : lo_cus TYPE REF TO cl_custpay.
+
+CLASS cl_custpay IMPLEMENTATION.
+
+  METHOD get_data.
+
+    SELECT a~bukrs,
+           a~kunnr,
+           a~bupla,
+           a~belnr,
+           a~gjahr,
+           a~augbl,
+           a~augdt,
+           a~zuonr,
+           a~budat,
+           a~bldat,
+           a~bldat AS netdt,
+           a~blart,
+           a~shkzg,
+           a~dmbtr,
+           a~wrbtr,
+           a~wrbtr AS inv,
+           a~wrbtr AS tinv,
+           a~wrbtr AS in_amt,
+           a~zbd1t,
+           k~name1
+           FROM bsad AS a
+           INNER JOIN kna1 AS k ON k~kunnr = a~kunnr
+           INTO TABLE @DATA(lt_final)
+           WHERE a~bukrs IN @s_bukrs
+           AND a~kunnr IN @s_kunnr
+           AND a~budat IN @s_budat
+           AND a~blart = 'RV'.
+
+    IF sy-subrc <> 0.
+      MESSAGE 'No Data Found' TYPE 'I'.
+      RETURN.
+    ENDIF.
+
+    loop at lt_final into data(ls_final).
+      MOVE-CORRESPONDING ls_final to gs_final.
+
+*---------------------------------------------------------------------*
+* Post Processing (Minimal ABAP Layer Logic)
+*---------------------------------------------------------------------*
+
+*    LOOP AT lt_final ASSIGNING FIELD-SYMBOL(<fs>).
+*
+*      "Adjust sign
+*      IF <fs>-shkzg = 'H'.
+*        gs_final-dmbtr = <fs>-dmbtr * -1.
+*      ENDIF.
+*
+*      "Due Date (Simplified logic for S/4)
+*      gs_final-netdt = <fs>-bldat + 30.
+*
+*      "Paid Days
+*      gs_final-pddys = <fs>-augdt - <fs>-bldat.
+*
+*      "Credit Days
+*      gs_final-crdys = <fs>-netdt - <fs>-bldat.
+*
+*      "Interest Calculation
+*      IF gs_final-pddys > 0.
+**        gs_final-in_amt = ( kbetr / 365 ) * gs_final-pddys * <fs>-dmbtr / 100.
+*
+*        IF <fs>-dmbtr <> 0.
+*          gs_final-inv =
+*            ( <fs>-in_amt * 100 ) / <fs>-dmbtr.
+*        ENDIF.
+*      ENDIF.
+
+      APPEND : gs_final TO gt_final.
+      CLEAR : gs_final.
+
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD display_data.
+*---------------------------------------------------------------------*
+* Modern ALV (CL_SALV_TABLE)
+*---------------------------------------------------------------------*
+    TRY.
+        CALL METHOD cl_salv_table=>factory
+          IMPORTING
+            r_salv_table = lo_cus_obj
+          CHANGING
+            t_table      = gt_final.
+      CATCH cx_salv_msg.
+    ENDTRY.
+
+    lo_gr_functions = lo_cus_obj->get_functions( ).
+    lo_gr_functions->set_all( abap_true ).
+    lo_columns = lo_cus_obj->get_columns( ).
+    lo_columns->set_optimize( 'X' ).
+
+    TRY.
+        lo_column = lo_columns->get_column( 'NAME1' ).
+        lo_column->set_short_text( 'Company' ).
+        lo_column->set_medium_text( 'Company_Name' ).
+      CATCH cx_salv_not_found INTO DATA(lx_nf).
+        MESSAGE lx_nf->get_text( ) TYPE 'E'.
+    ENDTRY.
+
+    lo_cus_obj->display( ).
+
+  ENDMETHOD.
+ENDCLASS.
