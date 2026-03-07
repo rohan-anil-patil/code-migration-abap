@@ -21,8 +21,8 @@ public class CodeMigrationService {
         this.webClient = webClientBuilder.baseUrl(baseUrl)
                 .build();
     }
-    public String generateCode(CodeMigrationModel codeMigrationModel) {
-        String prompt = buildPrompt(codeMigrationModel);
+    public String generateCode(String codeContent) {
+        String prompt = buildPrompt(codeContent);
 
         // construct request using ObjectMapper to ensure proper escaping
         ObjectMapper mapper = new ObjectMapper();
@@ -42,7 +42,7 @@ public class CodeMigrationService {
 
         try {
             String response = webClient.post()
-                    .uri(uriBuilder -> uriBuilder.path("/v1beta/models/gemini-3-flash-preview:generateContent")
+                    .uri(uriBuilder -> uriBuilder.path("/v1beta/models/gemini-3.1-pro-preview:generateContent")
                             .build())
                     .header("x-goog-api-key", apiKey)
                     .header("Content-Type", "application/json")
@@ -79,31 +79,46 @@ public class CodeMigrationService {
     }
 
 
-    private String buildPrompt(CodeMigrationModel codeMigrationModel) {
+    private String buildPrompt(String codeContent) {
         StringBuilder prompt = new StringBuilder();
 
         prompt.append("""
-You are an expert ABAP developer. Convert the following old syntax ABAP code to modern ABAP 7.4+ syntax.
-
-Migration Rules:
-1. Convert to modular structure with INCLUDE files (TOP, Selection Screen, Implementation)
-2. Replace TYPE-POOLS with direct TYPES declarations
-3. Convert internal table declarations to modern syntax: DATA : gt_table TYPE TABLE OF ty_structure
-4. Replace FORM routines with CLASS methods
-5. Use inline declarations: DATA(var), FIELD-SYMBOL(<fs>)
-6. Modern SQL with @ host variables: SELECT fields FROM table AS alias INTO TABLE @data WHERE conditions
-7. Replace REUSE_ALV_GRID_DISPLAY with CL_SALV_TABLE=>factory
-8. Use LOOP AT...INTO DATA(ls_var) instead of LOOP AT...INTO wa
-9. Replace manual field catalog building with automatic column optimization
-10. Use TRY-CATCH for exception handling
-11. Convert all MOVE statements to direct assignments or MOVE-CORRESPONDING
-12. Preserve all business logic and calculations exactly
-13. Return ONLY the migrated code with proper structure
-
-Old Syntax ABAP Code:
+               You are an expert SAP ABAP developer with deep knowledge of ABAP 7.4+ syntax and Object-Oriented ABAP.
+                
+                               Your task is to convert legacy ABAP code into modern ABAP 7.4+ syntax while preserving the exact business logic.
+                
+                               Strict Rules:
+                               1. Do NOT change the business logic.
+                               2. Do NOT remove validations or conditions.
+                               3. Do NOT modify variable meaning or program flow.
+                               4. Only modernize syntax and refactor into Object-Oriented ABAP where possible.
+                               5. If the input code is already using ABAP 7.4+ syntax, return the exact same code without changes.
+                               6. Maintain identical output behavior.
+                
+                               Conversion Requirements:
+                               - Replace old syntax with modern ABAP 7.4 syntax.
+                               - Use inline declarations (DATA(...)).
+                               - Use VALUE, NEW, CONV, REDUCE where applicable.
+                               - Replace APPEND/LOOP patterns with modern expressions where safe.
+                               - Replace READ TABLE with modern syntax using table expressions where possible.
+                               - Use FIELD-SYMBOLS or DATA(...) inline where appropriate.
+                               - Replace SELECT ... ENDSELECT with SELECT INTO TABLE or modern queries.
+                               - Convert procedural FORM routines into CLASS methods.
+                               - Wrap logic inside an Object-Oriented structure:
+                                 - CLASS definition
+                                 - PUBLIC/PRIVATE sections
+                                 - METHODS
+                
+                               Output Format:
+                               1. First show the converted ABAP 7.4+ Object-Oriented code.
+                               2. Ensure the code compiles in ABAP 7.4 or higher.
+                               3. Preserve comments if present.
+                               4. Do not include explanations unless explicitly asked.
+                
+                               Input ABAP Code:
 """);
 
-        prompt.append(codeMigrationModel.getCodeContent());
+        prompt.append(codeContent);
         prompt.append("\n\nProvide the complete migrated ABAP 7.4+ code with proper structure. Return only code, no explanations.");
 
         return prompt.toString();
