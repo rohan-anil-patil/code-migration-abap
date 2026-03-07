@@ -42,7 +42,7 @@ public class CodeMigrationService {
 
         try {
             String response = webClient.post()
-                    .uri(uriBuilder -> uriBuilder.path("/v1beta/models/gemini-3.1-pro-preview:generateContent")
+                    .uri(uriBuilder -> uriBuilder.path("/v1beta/models/gemini-3-flash-preview:generateContent")
                             .build())
                     .header("x-goog-api-key", apiKey)
                     .header("Content-Type", "application/json")
